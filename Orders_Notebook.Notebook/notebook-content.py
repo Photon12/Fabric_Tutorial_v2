@@ -23,7 +23,7 @@
 # CELL ********************
 
 # MAGIC %%sql
-# MAGIC Create SCHEMA first_schema
+# MAGIC Create SCHEMA IF NOT EXISTS first_schema
 
 # METADATA ********************
 
