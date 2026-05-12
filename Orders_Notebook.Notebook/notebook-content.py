@@ -22,6 +22,18 @@
 
 # CELL ********************
 
+# MAGIC %%sql
+# MAGIC Create SCHEMA first_schema
+
+# METADATA ********************
+
+# META {
+# META   "language": "sparksql",
+# META   "language_group": "synapse_pyspark"
+# META }
+
+# CELL ********************
+
 # Welcome to your new notebook
 # Type here in the cell editor to add code!
 # file_path = "/lakehouse/default/Files/Upload/products.xlsx"
@@ -54,6 +66,48 @@ df = pd.read_excel(file_path, engine="openpyxl")
 spark_df = spark.createDataFrame(df)
 
 spark_df.write.mode("overwrite").saveAsTable("First_Schema.Food_Prep_2")
+
+# METADATA ********************
+
+# META {
+# META   "language": "python",
+# META   "language_group": "synapse_pyspark"
+# META }
+
+# CELL ********************
+
+# Welcome to your new notebook
+# Type here in the cell editor to add code!
+# file_path = "/lakehouse/default/Files/Upload/products.xlsx"
+import pandas as pd
+file_path = '/lakehouse/default/Files/First_Workstream/orders_first.parquet'
+
+df = pd.read_excel(file_path, engine="openpyxl")
+
+spark_df = spark.createDataFrame(df)
+
+spark_df.write.mode("overwrite").saveAsTable("First_Schema.orders_first")
+
+# METADATA ********************
+
+# META {
+# META   "language": "python",
+# META   "language_group": "synapse_pyspark"
+# META }
+
+# CELL ********************
+
+# Welcome to your new notebook
+# Type here in the cell editor to add code!
+# file_path = "/lakehouse/default/Files/Upload/products.xlsx"
+import pandas as pd
+file_path = '/lakehouse/default/Files/First_Workstream/orders_second.parquet'
+
+df = pd.read_excel(file_path, engine="openpyxl")
+
+spark_df = spark.createDataFrame(df)
+
+spark_df.write.mode("overwrite").saveAsTable("First_Schema.orders_second")
 
 # METADATA ********************
 
