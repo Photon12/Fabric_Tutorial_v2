@@ -43,6 +43,17 @@ spark_df.write.mode("overwrite").saveAsTable("First_Schema.Food_Prep")
 
 # CELL ********************
 
+# Welcome to your new notebook
+# Type here in the cell editor to add code!
+# file_path = "/lakehouse/default/Files/Upload/products.xlsx"
+import pandas as pd
+file_path = '/lakehouse/default/Files/First_Workstream/Apocolypse Food Prep.xlsx'
+
+df = pd.read_excel(file_path, engine="openpyxl")
+
+spark_df = spark.createDataFrame(df)
+
+spark_df.write.mode("overwrite").saveAsTable("First_Schema.Food_Prep_2")
 
 # METADATA ********************
 
