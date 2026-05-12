@@ -22,18 +22,6 @@
 
 # CELL ********************
 
-# MAGIC %%sql
-# MAGIC Create SCHEMA IF NOT EXISTS first_schema
-
-# METADATA ********************
-
-# META {
-# META   "language": "sparksql",
-# META   "language_group": "synapse_pyspark"
-# META }
-
-# CELL ********************
-
 # Welcome to your new notebook
 # Type here in the cell editor to add code!
 # file_path = "/lakehouse/default/Files/Upload/products.xlsx"
@@ -76,17 +64,12 @@ spark_df.write.mode("overwrite").saveAsTable("First_Schema.Food_Prep_2")
 
 # CELL ********************
 
-# Welcome to your new notebook
-# Type here in the cell editor to add code!
-# file_path = "/lakehouse/default/Files/Upload/products.xlsx"
-import pandas as pd
-file_path = '/lakehouse/default/Files/First_Workstream/orders_first.parquet'
 
-df = pd.read_excel(file_path, engine="openpyxl")
+spark_df = spark.read.parquet("Files/First_Workstream/orders_second.parquet")
 
-spark_df = spark.createDataFrame(df)
+spark.sql("CREATE DATABASE IF NOT EXISTS First_Schema")
 
-spark_df.write.mode("overwrite").saveAsTable("First_Schema.orders_first")
+spark_df.write.mode("overwrite").saveAsTable("First_Schema.orders_second")
 
 # METADATA ********************
 
@@ -97,17 +80,11 @@ spark_df.write.mode("overwrite").saveAsTable("First_Schema.orders_first")
 
 # CELL ********************
 
-# Welcome to your new notebook
-# Type here in the cell editor to add code!
-# file_path = "/lakehouse/default/Files/Upload/products.xlsx"
-import pandas as pd
-file_path = '/lakehouse/default/Files/First_Workstream/orders_second.parquet'
+spark_df = spark.read.parquet("Files/First_Workstream/orders_first.parquet")
 
-df = pd.read_excel(file_path, engine="openpyxl")
+spark.sql("CREATE DATABASE IF NOT EXISTS First_Schema")
 
-spark_df = spark.createDataFrame(df)
-
-spark_df.write.mode("overwrite").saveAsTable("First_Schema.orders_second")
+spark_df.write.mode("overwrite").saveAsTable("First_Schema.orders_first")
 
 # METADATA ********************
 
