@@ -80,6 +80,7 @@ spark_df.write.mode("overwrite").saveAsTable("First_Schema.orders_second")
 
 # CELL ********************
 
+#THis has been added from 5832 branch
 spark_df = spark.read.parquet("Files/First_Workstream/orders_first.parquet")
 
 spark.sql("CREATE DATABASE IF NOT EXISTS First_Schema")
