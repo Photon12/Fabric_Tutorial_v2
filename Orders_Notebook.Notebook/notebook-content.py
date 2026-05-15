@@ -22,6 +22,17 @@
 
 # CELL ********************
 
+Print('Love is the greatest at 13:24')
+
+# METADATA ********************
+
+# META {
+# META   "language": "python",
+# META   "language_group": "synapse_pyspark"
+# META }
+
+# CELL ********************
+
 # Welcome to your new notebook
 # Type here in the cell editor to add code!
 # file_path = "/lakehouse/default/Files/Upload/products.xlsx"
