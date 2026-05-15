@@ -1,18 +1,42 @@
-name: Test Service Principal Token
+name: Test Service Principal Token + Fabric Sync Check
 
 on:
   workflow_dispatch:
 
 jobs:
-  test-token:
+  test-sync:
     runs-on: ubuntu-latest
 
     steps:
+
       - name: Get Azure AD token
+        id: token
         run: |
-          curl -X POST "https://login.microsoftonline.com/${{ secrets.TENANT_ID }}/oauth2/v2.0/token" \
+          TOKEN=$(curl -s -X POST "https://login.microsoftonline.com/${{ secrets.TENANT_ID }}/oauth2/v2.0/token" \
             -H "Content-Type: application/x-www-form-urlencoded" \
             -d "client_id=${{ secrets.CLIENT_ID }}" \
             -d "client_secret=${{ secrets.CLIENT_SECRET }}" \
             -d "scope=https://analysis.windows.net/powerbi/api/.default" \
-            -d "grant_type=client_credentials"
+            -d "grant_type=client_credentials" \
+            | jq -r .access_token)
+
+          echo "access_token=$TOKEN" >> $GITHUB_OUTPUT
+
+      - name: Check Fabric Git Sync
+        run: |
+          RESPONSE=$(curl -s -X GET \
+            "https://api.fabric.microsoft.com/v1/workspaces/${{ secrets.WORKSPACE_ID }}/git/status" \
+            -H "Authorization: Bearer ${{ steps.token.outputs.access_token }}")
+
+          echo "$RESPONSE"
+
+          STATE=$(echo "$RESPONSE" | jq -r .syncState)
+
+          echo "Sync state: $STATE"
+
+          if [ "$STATE" != "InSync" ]; then
+            echo "❌ Workspace NOT synced with Git"
+            exit 1
+          fi
+
+          echo "✅ Workspace is synced with Git"
