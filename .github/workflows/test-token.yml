@@ -1,15 +1,21 @@
-name: Test Service Principal Token + Fabric Sync Check
+name: Fabric Dev to Test Deployment
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
 
 jobs:
-  test-sync:
+  deploy-dev-to-test:
     runs-on: ubuntu-latest
 
     steps:
 
-      - name: Get Azure AD token
+      # ----------------------------
+      # STEP 1: GET ACCESS TOKEN
+      # ----------------------------
+      - name: Get Azure AD Token
         id: token
         run: |
           TOKEN=$(curl -s -X POST "https://login.microsoftonline.com/${{ secrets.TENANT_ID }}/oauth2/v2.0/token" \
@@ -22,21 +28,24 @@ jobs:
 
           echo "access_token=$TOKEN" >> $GITHUB_OUTPUT
 
-      - name: Check Fabric Git Sync
-        run: |
-          RESPONSE=$(curl -s -X GET \
-            "https://api.fabric.microsoft.com/v1/workspaces/${{ secrets.WORKSPACE_ID }}/git/status" \
-            -H "Authorization: Bearer ${{ steps.token.outputs.access_token }}")
 
+      # ----------------------------
+      # STEP 2: TRIGGER DEPLOYMENT PIPELINE
+      # ----------------------------
+      - name: Trigger Fabric Deployment Pipeline (Dev → Test)
+        run: |
+          echo "Triggering Fabric Deployment Pipeline..."
+
+          RESPONSE=$(curl -s -X POST \
+            "https://api.fabric.microsoft.com/v1/deploymentPipelines/${{ secrets.FABRIC_PIPELINE_ID }}/deploy" \
+            -H "Authorization: Bearer ${{ steps.token.outputs.access_token }}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "sourceStage": "Development",
+              "targetStage": "Test"
+            }')
+
+          echo "Response:"
           echo "$RESPONSE"
 
-          STATE=$(echo "$RESPONSE" | jq -r .syncState)
-
-          echo "Sync state: $STATE"
-
-          if [ "$STATE" != "InSync" ]; then
-            echo "❌ Workspace NOT synced with Git"
-            exit 1
-          fi
-
-          echo "✅ Workspace is synced with Git"
+          echo "Deployment trigger completed"
