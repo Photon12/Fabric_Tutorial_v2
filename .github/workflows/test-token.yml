@@ -7,14 +7,14 @@ on:
       - main
 
 jobs:
-  deploy-dev-to-test:
+  deploy:
     runs-on: ubuntu-latest
 
     steps:
 
-      # ----------------------------
-      # STEP 1: GET ACCESS TOKEN
-      # ----------------------------
+      # ------------------------------------
+      # 1. GET AZURE AD TOKEN
+      # ------------------------------------
       - name: Get Azure AD Token
         id: token
         run: |
@@ -29,23 +29,43 @@ jobs:
           echo "access_token=$TOKEN" >> $GITHUB_OUTPUT
 
 
-      # ----------------------------
-      # STEP 2: TRIGGER DEPLOYMENT PIPELINE
-      # ----------------------------
-      - name: Trigger Fabric Deployment Pipeline (Dev → Test)
+      # ------------------------------------
+      # 2. GET PIPELINE STAGES (DYNAMIC)
+      # ------------------------------------
+      - name: Get Deployment Pipeline Stages
+        id: stages
         run: |
-          echo "Triggering Fabric Deployment Pipeline..."
+          RESPONSE=$(curl -s -X GET \
+            "https://api.fabric.microsoft.com/v1/deploymentPipelines/${{ secrets.FABRIC_PIPELINE_ID }}" \
+            -H "Authorization: Bearer ${{ steps.token.outputs.access_token }}")
+
+          echo "Pipeline definition:"
+          echo "$RESPONSE"
+
+          DEV_ID=$(echo "$RESPONSE" | jq -r '.stages[] | select(.displayName=="Development") | .id')
+          TEST_ID=$(echo "$RESPONSE" | jq -r '.stages[] | select(.displayName=="Test") | .id')
+
+          echo "dev_stage_id=$DEV_ID" >> $GITHUB_OUTPUT
+          echo "test_stage_id=$TEST_ID" >> $GITHUB_OUTPUT
+
+
+      # ------------------------------------
+      # 3. TRIGGER DEPLOYMENT (DEV → TEST)
+      # ------------------------------------
+      - name: Trigger Fabric Deployment Pipeline
+        run: |
+          echo "Triggering Dev → Test deployment..."
 
           RESPONSE=$(curl -s -X POST \
             "https://api.fabric.microsoft.com/v1/deploymentPipelines/${{ secrets.FABRIC_PIPELINE_ID }}/deploy" \
             -H "Authorization: Bearer ${{ steps.token.outputs.access_token }}" \
             -H "Content-Type: application/json" \
-            -d '{
-              "sourceStage": "Development",
-              "targetStage": "Test"
-            }')
+            -d "{
+              \"sourceStageId\": \"${{ steps.stages.outputs.dev_stage_id }}\",
+              \"targetStageId\": \"${{ steps.stages.outputs.test_stage_id }}\"
+            }")
 
           echo "Response:"
           echo "$RESPONSE"
 
-          echo "Deployment trigger completed"
+          echo "Deployment triggered"
