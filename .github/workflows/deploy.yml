@@ -1,4 +1,4 @@
-name: Fabric Dev to Test Deployment New
+name: Fabric Dev to Test Deployment
 on:
   workflow_dispatch:
   push:
@@ -9,7 +9,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       # ------------------------------------
-      # 1. GET AZURE AD TOKEN
+      # 1. CHECKOUT REPO
+      # ------------------------------------
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # ------------------------------------
+      # 2. GET AZURE AD TOKEN
       # ------------------------------------
       - name: Get Azure AD Token
         id: token
@@ -21,21 +27,29 @@ jobs:
             -d "scope=https://analysis.windows.net/powerbi/api/.default" \
             -d "grant_type=client_credentials" \
             | jq -r .access_token)
+
+          if [ "$TOKEN" = "null" ] || [ -z "$TOKEN" ]; then
+            echo "❌ Failed to get token!"
+            exit 1
+          fi
+
+          echo "✅ Token OK"
           echo "access_token=$TOKEN" >> $GITHUB_OUTPUT
 
       # ------------------------------------
-      # 2. SYNC GIT → DEV WORKSPACE
+      # 3. SYNC GIT → DEV WORKSPACE
       # ------------------------------------
       - name: Sync Git to Dev Workspace
         run: |
-          echo "Syncing Git to Dev workspace..."
+          COMMIT_HASH="${{ github.sha }}"
+          echo "Syncing Git to Dev workspace (commit: $COMMIT_HASH)..."
+
           RESPONSE=$(curl -s -w "\nHTTP_STATUS:%{http_code}" -X POST \
             "https://api.fabric.microsoft.com/v1/workspaces/${{ secrets.WORKSPACE_ID }}/git/updateFromGit" \
             -H "Authorization: Bearer ${{ steps.token.outputs.access_token }}" \
             -H "Content-Type: application/json" \
             -d "{
-              \"workspaceHead\": null,
-              \"remoteCommitHash\": null,
+              \"remoteCommitHash\": \"$COMMIT_HASH\",
               \"conflictResolution\": {
                 \"conflictResolutionType\": \"Workspace\",
                 \"conflictResolutionPolicy\": \"PreferRemote\"
@@ -57,10 +71,10 @@ jobs:
           fi
 
           echo "✅ Git sync triggered, waiting 30s for it to complete..."
-          sleep 60
+          sleep 30
 
       # ------------------------------------
-      # 3. GET PIPELINE STAGES (DYNAMIC)
+      # 4. GET PIPELINE STAGES (DYNAMIC)
       # ------------------------------------
       - name: Get Deployment Pipeline Stages
         id: stages
@@ -68,8 +82,10 @@ jobs:
           RESPONSE=$(curl -s -X GET \
             "https://api.fabric.microsoft.com/v1/deploymentPipelines/${{ secrets.FABRIC_PIPELINE_ID }}" \
             -H "Authorization: Bearer ${{ steps.token.outputs.access_token }}")
+
           echo "Pipeline definition:"
           echo "$RESPONSE"
+
           DEV_ID=$(echo "$RESPONSE" | jq -r '.stages[] | select(.displayName=="Development") | .id')
           TEST_ID=$(echo "$RESPONSE" | jq -r '.stages[] | select(.displayName=="Test") | .id')
 
@@ -91,7 +107,7 @@ jobs:
           echo "test_stage_id=$TEST_ID" >> $GITHUB_OUTPUT
 
       # ------------------------------------
-      # 4. TRIGGER DEPLOYMENT (DEV → TEST)
+      # 5. TRIGGER DEPLOYMENT (DEV → TEST)
       # ------------------------------------
       - name: Trigger Fabric Deployment Pipeline
         run: |
