@@ -1,0 +1,71 @@
+name: Fabric Dev to Test Deployment
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+
+      # ------------------------------------
+      # 1. GET AZURE AD TOKEN
+      # ------------------------------------
+      - name: Get Azure AD Token
+        id: token
+        run: |
+          TOKEN=$(curl -s -X POST "https://login.microsoftonline.com/${{ secrets.TENANT_ID }}/oauth2/v2.0/token" \
+            -H "Content-Type: application/x-www-form-urlencoded" \
+            -d "client_id=${{ secrets.CLIENT_ID }}" \
+            -d "client_secret=${{ secrets.CLIENT_SECRET }}" \
+            -d "scope=https://analysis.windows.net/powerbi/api/.default" \
+            -d "grant_type=client_credentials" \
+            | jq -r .access_token)
+
+          echo "access_token=$TOKEN" >> $GITHUB_OUTPUT
+
+
+      # ------------------------------------
+      # 2. GET PIPELINE STAGES (DYNAMIC)
+      # ------------------------------------
+      - name: Get Deployment Pipeline Stages
+        id: stages
+        run: |
+          RESPONSE=$(curl -s -X GET \
+            "https://api.fabric.microsoft.com/v1/deploymentPipelines/${{ secrets.FABRIC_PIPELINE_ID }}" \
+            -H "Authorization: Bearer ${{ steps.token.outputs.access_token }}")
+
+          echo "Pipeline definition:"
+          echo "$RESPONSE"
+
+          DEV_ID=$(echo "$RESPONSE" | jq -r '.stages[] | select(.displayName=="Development") | .id')
+          TEST_ID=$(echo "$RESPONSE" | jq -r '.stages[] | select(.displayName=="Test") | .id')
+
+          echo "dev_stage_id=$DEV_ID" >> $GITHUB_OUTPUT
+          echo "test_stage_id=$TEST_ID" >> $GITHUB_OUTPUT
+
+
+      # ------------------------------------
+      # 3. TRIGGER DEPLOYMENT (DEV → TEST)
+      # ------------------------------------
+      - name: Trigger Fabric Deployment Pipeline
+        run: |
+          echo "Triggering Dev → Test deployment..."
+
+          RESPONSE=$(curl -s -X POST \
+            "https://api.fabric.microsoft.com/v1/deploymentPipelines/${{ secrets.FABRIC_PIPELINE_ID }}/deploy" \
+            -H "Authorization: Bearer ${{ steps.token.outputs.access_token }}" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"sourceStageId\": \"${{ steps.stages.outputs.dev_stage_id }}\",
+              \"targetStageId\": \"${{ steps.stages.outputs.test_stage_id }}\"
+            }")
+
+          echo "Response:"
+          echo "$RESPONSE"
+
+          echo "Deployment triggered"
