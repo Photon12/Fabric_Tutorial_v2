@@ -1,4 +1,4 @@
-name: Fabric Dev to Test Deployment (User Auth Test)
+name: Fabric Dev to Test Deployment (User Auth Fixed)
 
 on:
   workflow_dispatch:
@@ -10,12 +10,12 @@ jobs:
     steps:
 
       # ------------------------------------
-      # 1. GET USER TOKEN (DEVICE FLOW)
+      # 1. DEVICE LOGIN + TOKEN POLLING
       # ------------------------------------
-      - name: Get User Token (Device Login)
+      - name: Get User Token (Device Flow - FIXED)
         id: token
         run: |
-          echo "Starting device login flow..."
+          echo "Starting device login..."
 
           RESPONSE=$(curl -s -X POST "https://login.microsoftonline.com/${{ secrets.TENANT_ID }}/oauth2/v2.0/devicecode" \
             -H "Content-Type: application/x-www-form-urlencoded" \
@@ -28,26 +28,51 @@ jobs:
           USER_CODE=$(echo "$RESPONSE" | jq -r .user_code)
           VERIFICATION_URI=$(echo "$RESPONSE" | jq -r .verification_uri)
 
-          echo ""
           echo "======================================"
           echo "OPEN THIS URL: $VERIFICATION_URI"
           echo "ENTER CODE: $USER_CODE"
           echo "======================================"
 
-          # Poll for token
-          TOKEN_RESPONSE=$(curl -s -X POST "https://login.microsoftonline.com/${{ secrets.TENANT_ID }}/oauth2/v2.0/token" \
-            -H "Content-Type: application/x-www-form-urlencoded" \
-            -d "grant_type=urn:ietf:params:oauth:grant-type:device_code" \
-            -d "client_id=${{ secrets.CLIENT_ID }}" \
-            -d "device_code=$DEVICE_CODE")
+          # ------------------------------------
+          # POLL UNTIL LOGIN COMPLETES
+          # ------------------------------------
+          ACCESS_TOKEN=""
 
-          ACCESS_TOKEN=$(echo "$TOKEN_RESPONSE" | jq -r .access_token)
+          for i in {1..20}
+          do
+            echo "Polling login attempt $i..."
 
-          echo "access_token=$ACCESS_TOKEN" >> $GITHUB_OUTPUT
+            TOKEN_RESPONSE=$(curl -s -X POST "https://login.microsoftonline.com/${{ secrets.TENANT_ID }}/oauth2/v2.0/token" \
+              -H "Content-Type: application/x-www-form-urlencoded" \
+              -d "grant_type=urn:ietf:params:oauth:grant-type:device_code" \
+              -d "client_id=${{ secrets.CLIENT_ID }}" \
+              -d "device_code=$DEVICE_CODE")
+
+            ACCESS_TOKEN=$(echo "$TOKEN_RESPONSE" | jq -r .access_token)
+
+            if [ "$ACCESS_TOKEN" != "null" ] && [ "$ACCESS_TOKEN" != "" ]; then
+              echo "Login successful"
+              echo "access_token=$ACCESS_TOKEN" >> $GITHUB_OUTPUT
+              exit 0
+            fi
+
+            ERROR=$(echo "$TOKEN_RESPONSE" | jq -r .error)
+
+            if [ "$ERROR" != "authorization_pending" ]; then
+              echo "Auth error: $ERROR"
+              echo "$TOKEN_RESPONSE"
+              exit 1
+            fi
+
+            sleep 5
+          done
+
+          echo "Login timed out"
+          exit 1
 
 
       # ------------------------------------
-      # 2. GET PIPELINE STAGES (DYNAMIC)
+      # 2. GET PIPELINE STAGES
       # ------------------------------------
       - name: Get Deployment Pipeline Stages
         id: stages
@@ -56,7 +81,6 @@ jobs:
             "https://api.fabric.microsoft.com/v1/deploymentPipelines/${{ secrets.FABRIC_PIPELINE_ID }}" \
             -H "Authorization: Bearer ${{ steps.token.outputs.access_token }}")
 
-          echo "Pipeline definition:"
           echo "$RESPONSE"
 
           DEV_ID=$(echo "$RESPONSE" | jq -r '.stages[] | select(.displayName=="Development") | .id')
